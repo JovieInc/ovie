@@ -62,4 +62,31 @@ final class ShipLedgerTests: XCTestCase {
         XCTAssertTrue(ShipLedger.isProcessAlive(Int(ProcessInfo.processInfo.processIdentifier)))
         XCTAssertFalse(ShipLedger.isProcessAlive(99_999_999))
     }
+
+    func testHudURLDefaultsToProduction() {
+        XCTAssertEqual(OvieConfig.hudURL(environment: [:]), URL(string: "https://jov.ie/hud"))
+    }
+
+    func testHudURLHonorsDevOverride() {
+        let url = OvieConfig.hudURL(environment: ["OVIE_HUD_URL": "http://localhost:3000/hud"])
+        XCTAssertEqual(url, URL(string: "http://localhost:3000/hud"))
+    }
+
+    func testHudURLIgnoresEmptyOverride() {
+        XCTAssertEqual(
+            OvieConfig.hudURL(environment: ["OVIE_HUD_URL": ""]),
+            URL(string: "https://jov.ie/hud")
+        )
+    }
+
+    func testHudURLIgnoresNonHttpOverride() {
+        XCTAssertEqual(
+            OvieConfig.hudURL(environment: ["OVIE_HUD_URL": "hud"]),
+            URL(string: "https://jov.ie/hud")
+        )
+        XCTAssertEqual(
+            OvieConfig.hudURL(environment: ["OVIE_HUD_URL": "javascript:alert(1)"]),
+            URL(string: "https://jov.ie/hud")
+        )
+    }
 }
