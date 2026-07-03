@@ -14,6 +14,22 @@ enum OvieConfig {
     static let jobsLogPath = "\(NSHomeDirectory())/.hermes/logs/jobs.jsonl"
     static let pauseSentinelPath = "\(NSHomeDirectory())/.hermes/shipping-paused"
     static let maxLogLines = 200
+
+    /// Ovie's admin/ops surface is the Jovie web app's `/hud` route (redirects
+    /// to the in-shell ops view). `OVIE_HUD_URL` lets a developer point this at
+    /// a local `pnpm dev` server instead of production.
+    static let productionHudURL = URL(string: "https://jov.ie/hud")!
+
+    static func hudURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let override = environment["OVIE_HUD_URL"],
+            let url = URL(string: override),
+            let scheme = url.scheme,
+            ["http", "https"].contains(scheme)
+        {
+            return url
+        }
+        return productionHudURL
+    }
 }
 
 // MARK: - Log event model
@@ -182,6 +198,14 @@ func relaunchOvie() {
     NSApplication.shared.terminate(nil)
 }
 
+/// Hands off from the menu bar to the deep ops view: opens the Jovie web
+/// app in the system default browser, same as the Jovie Electron app's
+/// external-link handoff (`NSWorkspace` under `shell.openExternal`). No
+/// embedded webview — Swift stays a menu bar, the web app is the surface.
+func openOvieHud() {
+    NSWorkspace.shared.open(OvieConfig.hudURL())
+}
+
 // MARK: - App
 
 @main
@@ -279,6 +303,7 @@ struct OvieMenuContent: View {
         Divider()
 
         Section {
+            Button("Open Ovie") { openOvieHud() }
             if model.status.isPaused {
                 Button("Resume shipping") {
                     resumeShipping()
