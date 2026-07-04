@@ -229,6 +229,7 @@ struct OvieApp: App {
 @MainActor
 final class OvieModel: ObservableObject {
     @Published var status = OvieStatus()
+    @Published var gbrain = GBrainHealth()
     private var timer: Timer?
 
     init() {
@@ -246,6 +247,10 @@ final class OvieModel: ObservableObject {
             inflight: ShipLedger.readJournal(),
             owner: ShipLedger.readOwner()
         )
+        Task { [weak self] in
+            let health = await checkGBrainHealth()
+            self?.gbrain = health
+        }
     }
 }
 
@@ -276,6 +281,29 @@ struct OvieMenuContent: View {
                     "Ship owner",
                     value: "\(owner.caller ?? "?") pid \(owner.pid.map(String.init) ?? "?")\(model.status.ownerAlive ? "" : " (dead — next start recovers)")"
                 )
+            }
+        }
+
+        Divider()
+
+        Section {
+            HStack {
+                Circle()
+                    .fill(model.gbrain.state.color)
+                    .frame(width: 10, height: 10)
+                Text("gbrain: \(model.gbrain.state.label)")
+                Spacer()
+            }
+            .padding(.vertical, 2)
+            if let latency = model.gbrain.latencyMs {
+                LabeledContent("Latency", value: "\(latency) ms")
+            }
+            LabeledContent("Last check", value: model.gbrain.lastCheckedLabel)
+            if model.gbrain.state == .down, let detail = model.gbrain.statusText {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
             }
         }
 
