@@ -1,5 +1,13 @@
 # Ovie
 
+> **⚠️ ARCHIVED (2026-07).** This Swift menu-bar app was the original Ovie
+> plan. Per founder direction, **Ovie is now the Jovie web app's `/hud`
+> route** (`apps/web/app/hud` in [JovieInc/Jovie](https://github.com/JovieInc/Jovie)).
+> This repo is kept read-only for reference; the Swift codebase is a
+> launcher only and receives no further development. See
+> [JovieInc/Jovie#12894](https://github.com/JovieInc/Jovie/issues/12894)
+> and `docs/OVIE.md` in the Jovie repo.
+
 The company OS that runs Jovie's engineering org — a Mac menu-bar app over
 the autonomous ship loop (codex-issue-shipper + kanban shipper), built on
 the [ship-ledger contract](LEDGER.md) so restarts and auto-updates never
