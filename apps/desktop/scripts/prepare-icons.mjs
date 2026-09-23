@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { copyFile, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -23,6 +23,11 @@ const iconEntries = [
 if (process.platform !== 'darwin') {
   throw new Error('macOS icon preparation requires iconutil.');
 }
+
+await copyFile(
+  path.join(assetsRoot, 'icon.png'),
+  path.join(assetsRoot, 'icon-staging.png')
+);
 
 for (const name of ['icon', 'icon-staging']) {
   const source = path.join(assetsRoot, `${name}.png`);
