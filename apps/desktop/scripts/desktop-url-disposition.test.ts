@@ -1,0 +1,153 @@
+import { expect, test } from 'vitest';
+import {
+  getUrlDisposition,
+  type UrlDisposition,
+  type UrlDispositionOptions,
+} from '../src/navigation.ts';
+
+const productionPolicy = {
+  appUrl: 'https://jov.ie',
+  appEnv: 'production',
+} as const satisfies UrlDispositionOptions;
+
+const localPolicy = {
+  appUrl: 'http://127.0.0.1:3112',
+  appEnv: 'local',
+} as const satisfies UrlDispositionOptions;
+
+function assertDisposition(
+  policy: UrlDispositionOptions,
+  disposition: UrlDisposition,
+  urls: readonly string[]
+) {
+  for (const url of urls) {
+    expect(getUrlDisposition(url, policy), url).toBe(disposition);
+  }
+}
+
+test('desktop disposition keeps authenticated app and auth callback routes in-app', () => {
+  assertDisposition(productionPolicy, 'in-app', [
+    'https://jov.ie/app',
+    'https://jov.ie/app/chat?runtime=electron',
+    'https://jov.ie/app/ov/chat',
+    'https://jov.ie/hud',
+    'https://jov.ie/hud?fs=1',
+    'https://jov.ie/app/settings/usage',
+    'https://jov.ie/desktop-auth?auth_url=https%3A%2F%2Fjov.ie%2Fsignin',
+    'https://jov.ie/auth/native-complete?client=electron&state=state_123',
+    'https://jov.ie/auth/native-return?code=code_123&state=state_123',
+    'https://jov.ie/auth/ios/complete?code=code_123&state=state_123',
+    'https://jov.ie/signin/sso-callback?desktop_return=%2Fapp',
+    'https://jov.ie/signup/sso-callback?desktop_return=%2Fstart',
+    'https://jov.ie/sso-callback?desktop_return=%2Fapp',
+    'https://jov.ie/auth/callback?desktop_return=%2Fapp',
+    'https://jov.ie/app/auth/callback?desktop_return=%2Fapp',
+  ]);
+});
+
+test('desktop disposition opens auth routes externally instead of in-app', () => {
+  assertDisposition(productionPolicy, 'external', [
+    'https://jov.ie/signin',
+    'https://jov.ie/auth/start?client=electron&intent=sign_in&return_to=%2Fapp',
+    'https://jov.ie/signup?desktop_return=%2Fapp',
+    'https://jov.ie/sign-in',
+    'https://jov.ie/sign-up',
+  ]);
+});
+
+test('desktop disposition opens canonical public profiles in a native preview', () => {
+  assertDisposition(productionPolicy, 'profile-preview', [
+    'https://jov.ie/tim',
+    'https://jov.ie/tim/pay?source=qr',
+    'https://jov.ie/tim/summer-tour/sounds#latest',
+  ]);
+  assertDisposition(localPolicy, 'profile-preview', [
+    'http://127.0.0.1:3112/tim',
+  ]);
+});
+
+test('desktop disposition opens allowlisted non-profile routes externally', () => {
+  assertDisposition(productionPolicy, 'external', [
+    'https://jov.ie/',
+    'https://jov.ie/legal/privacy',
+    'https://jov.ie/legal/cookies',
+    'https://jov.ie/pricing',
+    'https://jov.ie/blog',
+    'https://jov.ie/blog/the-contact-problem',
+    'https://jov.ie/about',
+    'https://jov.ie/download',
+    'https://jov.ie/docs/getting-started',
+    'https://docs.jov.ie/getting-started',
+    'mailto:support@jov.ie',
+  ]);
+});
+
+test('desktop disposition opens public redirect and claim routes externally', () => {
+  assertDisposition(productionPolicy, 'external', [
+    'https://jov.ie/r/my-release',
+    'https://jov.ie/s/abc123',
+    'https://jov.ie/go/link_123',
+    'https://jov.ie/out/link_123',
+    'https://jov.ie/claim/token_123',
+    'https://jov.ie/artists',
+    'https://jov.ie/p/token_123',
+    'https://jov.ie/a/somehandle',
+    'https://jov.ie/drop/token_123',
+  ]);
+  assertDisposition(localPolicy, 'external', [
+    'http://127.0.0.1:3112/r/my-release',
+    'http://127.0.0.1:3112/out/link_123',
+  ]);
+});
+
+test('desktop disposition blocks unsafe protocols and foreign hosts', () => {
+  assertDisposition(productionPolicy, 'blocked', [
+    'javascript:globalThis.evil=true',
+    'file:///Users/tim/.ssh/id_rsa',
+    'data:text/html,<script>alert(1)</script>',
+    '//jov.ie/app',
+    'https://evil.com/app',
+    'https://jov.ie.evil.com/app',
+    'https://docs.evil.com/getting-started',
+    'http://jov.ie/app',
+    'https://jov.ie/%2F%2Fevil.com',
+    'https://jov.ie/__clerk/v1/client',
+    'https://jov.ie/api/health',
+    'https://jov.ie/App',
+    'https://jov.ie/Auth',
+  ]);
+});
+
+test('desktop disposition allows local app origin only when running locally', () => {
+  assertDisposition(localPolicy, 'in-app', [
+    'http://127.0.0.1:3112/app',
+    'http://127.0.0.1:3100/app',
+    'http://127.0.0.1:3112/signin/sso-callback?desktop_return=%2Fapp',
+  ]);
+  assertDisposition(localPolicy, 'external', [
+    'http://127.0.0.1:3112/',
+    'http://127.0.0.1:3112/pricing',
+  ]);
+  assertDisposition(localPolicy, 'blocked', [
+    'http://localhost:3112/app',
+    'https://127.0.0.1:3112/app',
+  ]);
+});
+
+test('desktop disposition allows Clerk auth provider origins externally (https wildcard) and blocks unsafe variants', () => {
+  // Valid Clerk handoff URLs (from "Open in Browser" flows) must be external
+  assertDisposition(productionPolicy, 'external', [
+    'https://foo-bar.clerk.accounts.dev/sign-in?__clerk_session_id=...',
+    'https://distinct-giraffe-5.clerk.accounts.dev/v1/client?__clerk_api_version=...',
+  ]);
+  // Unsafe variants (wrong protocol, bare base host, evil host, path tricks) remain blocked
+  assertDisposition(productionPolicy, 'blocked', [
+    'https://clerk.accounts.dev/sign-up?redirect_url=...',
+    'http://foo.clerk.accounts.dev/sign-in',
+    'https://foo.clerk.accounts.dev:8443/sign-in',
+    'https://evil.com.clerk.accounts.dev/sign-in',
+    'https://evilclerk.accounts.dev/sign-in',
+    'https://clerk.accounts.dev.evil.com/sign-in',
+    'https://jov.ie.evil.com/clerk.accounts.dev',
+  ]);
+});
