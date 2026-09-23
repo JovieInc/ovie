@@ -30,5 +30,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm desktop:typecheck
+      - run: pnpm --filter @jovie/desktop prepare:assets
       - run: pnpm desktop:test
       - run: pnpm desktop:package:local
